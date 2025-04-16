@@ -23,7 +23,7 @@ graph TD
         L --> M[AuthContext]
     end
 
-    subgraph Backend Services
+    subgraph Backend
         N[Supabase] --> O[Authentication]
         N --> P[Database]
         P --> Q[Projects Table]
@@ -35,15 +35,13 @@ graph TD
         T --> W[Task Prioritization]
     end
 
-    subgraph Data Flow
-        Frontend --> Backend Services
-        AuthContext --> Supabase
-        AIFeatures --> OpenAI API
-    end
+    Frontend --> Backend
+    M --> N
+    J --> S
 
-    style Frontend fill:#f9f,stroke:#333,stroke-width:2px
-    style Backend Services fill:#bbf,stroke:#333,stroke-width:2px
-    style Data Flow fill:#dfd,stroke:#333,stroke-width:2px
+    classDef frontend fill:#f9f,stroke:#333,stroke-width:2px
+    classDef backend fill:#bbf,stroke:#333,stroke-width:2px
+    class Frontend,Backend frontend,backend
 ```
 
 ### Architecture Components
