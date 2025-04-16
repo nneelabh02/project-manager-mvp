@@ -8,6 +8,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Link from 'next/link';
+import DatePicker from 'react-datepicker';
 
 // Define the Task interface
 interface Task {
@@ -15,6 +16,9 @@ interface Task {
   title: string;
   description: string;
   status: "todo" | "in_progress" | "done";
+  dueDate?: string;
+  reminderDate?: string;
+  reminderEnabled?: boolean;
 }
 
 const getStatusColor = (status: Task["status"]) => {
@@ -51,6 +55,9 @@ interface ProjectDetailsContentProps {
 const SortableTaskCard = ({ task, onEdit, onDelete }: { task: Task; onEdit: (updatedTask: Task) => void; onDelete: (taskId: string) => void }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTask, setEditedTask] = useState<Task>(task);
+  const [dueDate, setDueDate] = useState<Date | null>(task.dueDate ? new Date(task.dueDate) : null);
+  const [reminderDate, setReminderDate] = useState<Date | null>(task.reminderDate ? new Date(task.reminderDate) : null);
+  const [reminderEnabled, setReminderEnabled] = useState<boolean>(task.reminderEnabled || false);
   const {
     attributes,
     listeners,
@@ -124,6 +131,58 @@ const SortableTaskCard = ({ task, onEdit, onDelete }: { task: Task; onEdit: (upd
             <option value="in_progress">In Progress</option>
             <option value="done">Done</option>
           </select>
+          <div className="mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+            <DatePicker
+              selected={dueDate}
+              onChange={(date) => {
+                setDueDate(date);
+                setEditedTask({ ...editedTask, dueDate: date?.toISOString() });
+              }}
+              minDate={new Date()}
+              className="w-full p-2 border rounded"
+              dateFormat="MMMM d, yyyy"
+              placeholderText="Select due date"
+            />
+          </div>
+          <div className="mb-2">
+            <div className="flex items-center mb-2">
+              <input
+                type="checkbox"
+                id="reminderEnabled"
+                checked={reminderEnabled}
+                onChange={(e) => {
+                  setReminderEnabled(e.target.checked);
+                  setEditedTask({ 
+                    ...editedTask, 
+                    reminderEnabled: e.target.checked,
+                    reminderDate: e.target.checked ? reminderDate?.toISOString() : undefined
+                  });
+                }}
+                className="mr-2"
+              />
+              <label htmlFor="reminderEnabled" className="text-sm font-medium text-gray-700">
+                Enable Reminder
+              </label>
+            </div>
+            {reminderEnabled && (
+              <div className="ml-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reminder Date</label>
+                <DatePicker
+                  selected={reminderDate}
+                  onChange={(date) => {
+                    setReminderDate(date);
+                    setEditedTask({ ...editedTask, reminderDate: date?.toISOString() });
+                  }}
+                  minDate={new Date()}
+                  maxDate={dueDate ? new Date(dueDate) : undefined}
+                  className="w-full p-2 border rounded"
+                  dateFormat="MMMM d, yyyy"
+                  placeholderText="Select reminder date"
+                />
+              </div>
+            )}
+          </div>
           <div className="flex gap-2">
             <button
               onClick={handleSave}
@@ -168,6 +227,16 @@ const SortableTaskCard = ({ task, onEdit, onDelete }: { task: Task; onEdit: (upd
               </span>
               <h3 className="text-lg font-semibold flex-grow">{task.title}</h3>
             </div>
+            {task.dueDate && (
+              <div className="text-sm text-gray-500">
+                Due: {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              </div>
+            )}
+            {task.reminderEnabled && task.reminderDate && (
+              <div className="text-sm text-blue-500">
+                Reminder: {new Date(task.reminderDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              </div>
+            )}
           </div>
           <p className="text-gray-600 mb-4">{task.description}</p>
           
@@ -230,10 +299,18 @@ const ProjectDetailsContent = ({ projectId }: ProjectDetailsContentProps) => {
   }, [projectId]);
 
   // Handle adding a task
-  const handleAddTask = async (title: string, description: string, status: "todo" | "in_progress" | "done") => {
+  const handleAddTask = async (title: string, description: string, status: "todo" | "in_progress" | "done", dueDate?: string, reminderDate?: string, reminderEnabled?: boolean) => {
     const { data, error } = await supabase
       .from("tasks")
-      .insert([{ title, description, status, project_id: projectId }])
+      .insert([{ 
+        title, 
+        description, 
+        status, 
+        project_id: projectId,
+        dueDate,
+        reminderDate,
+        reminderEnabled
+      }])
       .single();
 
     if (error) {
