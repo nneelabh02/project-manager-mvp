@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/utils/supabaseClient";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import TaskForm from "@/components/TaskForm";
 import TaskCard from "@/components/TaskCard";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -9,6 +9,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from '@dnd-kit/utilities';
 import Link from 'next/link';
 import DatePicker from 'react-datepicker';
+import { Database } from "@/types/supabase";
 
 // Define the Task interface
 interface Task {
@@ -55,9 +56,6 @@ interface ProjectDetailsContentProps {
 const SortableTaskCard = ({ task, onEdit, onDelete }: { task: Task; onEdit: (updatedTask: Task) => void; onDelete: (taskId: string) => void }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTask, setEditedTask] = useState<Task>(task);
-  const [dueDate, setDueDate] = useState<Date | null>(task.dueDate ? new Date(task.dueDate) : null);
-  const [reminderDate, setReminderDate] = useState<Date | null>(task.reminderDate ? new Date(task.reminderDate) : null);
-  const [reminderEnabled, setReminderEnabled] = useState<boolean>(task.reminderEnabled || false);
   const {
     attributes,
     listeners,
@@ -79,10 +77,6 @@ const SortableTaskCard = ({ task, onEdit, onDelete }: { task: Task; onEdit: (upd
     opacity: isDragging ? 0.8 : 1,
     position: 'relative' as const,
     zIndex: isDragging ? 1 : 0,
-    cursor: 'grab',
-    touchAction: 'none',
-    transformOrigin: '0 0',
-    willChange: 'transform',
     boxShadow: isDragging ? '0 8px 16px rgba(0,0,0,0.1)' : 'none',
   };
 
@@ -92,10 +86,12 @@ const SortableTaskCard = ({ task, onEdit, onDelete }: { task: Task; onEdit: (upd
   };
 
   const handleEdit = () => {
+    console.log("Edit clicked for task:", task.id);
     setIsEditing(true);
   };
 
   const handleSave = () => {
+    console.log("Save clicked for task:", editedTask.id);
     onEdit(editedTask);
     setIsEditing(false);
   };
@@ -107,92 +103,40 @@ const SortableTaskCard = ({ task, onEdit, onDelete }: { task: Task; onEdit: (upd
 
   if (isEditing) {
     return (
-      <div ref={setNodeRef} style={style} className="relative">
-        <div className="p-4 border rounded-lg shadow-sm bg-white">
+      <div ref={setNodeRef} style={style} className="bg-white p-4 rounded-lg shadow mb-4">
+        <div className="space-y-4">
           <input
             type="text"
             value={editedTask.title}
             onChange={(e) => setEditedTask({ ...editedTask, title: e.target.value })}
-            className="w-full p-2 mb-2 border rounded"
+            className="w-full p-2 border rounded"
             placeholder="Task title"
           />
           <textarea
             value={editedTask.description}
             onChange={(e) => setEditedTask({ ...editedTask, description: e.target.value })}
-            className="w-full p-2 mb-2 border rounded"
+            className="w-full p-2 border rounded"
             placeholder="Task description"
           />
           <select
             value={editedTask.status}
             onChange={(e) => setEditedTask({ ...editedTask, status: e.target.value as Task["status"] })}
-            className="w-full p-2 mb-2 border rounded"
+            className="w-full p-2 border rounded"
           >
             <option value="todo">To Do</option>
             <option value="in_progress">In Progress</option>
             <option value="done">Done</option>
           </select>
-          <div className="mb-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-            <DatePicker
-              selected={dueDate}
-              onChange={(date) => {
-                setDueDate(date);
-                setEditedTask({ ...editedTask, dueDate: date?.toISOString() });
-              }}
-              minDate={new Date()}
-              className="w-full p-2 border rounded"
-              dateFormat="MMMM d, yyyy"
-              placeholderText="Select due date"
-            />
-          </div>
-          <div className="mb-2">
-            <div className="flex items-center mb-2">
-              <input
-                type="checkbox"
-                id="reminderEnabled"
-                checked={reminderEnabled}
-                onChange={(e) => {
-                  setReminderEnabled(e.target.checked);
-                  setEditedTask({ 
-                    ...editedTask, 
-                    reminderEnabled: e.target.checked,
-                    reminderDate: e.target.checked ? reminderDate?.toISOString() : undefined
-                  });
-                }}
-                className="mr-2"
-              />
-              <label htmlFor="reminderEnabled" className="text-sm font-medium text-gray-700">
-                Enable Reminder
-              </label>
-            </div>
-            {reminderEnabled && (
-              <div className="ml-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Reminder Date</label>
-                <DatePicker
-                  selected={reminderDate}
-                  onChange={(date) => {
-                    setReminderDate(date);
-                    setEditedTask({ ...editedTask, reminderDate: date?.toISOString() });
-                  }}
-                  minDate={new Date()}
-                  maxDate={dueDate ? new Date(dueDate) : undefined}
-                  className="w-full p-2 border rounded"
-                  dateFormat="MMMM d, yyyy"
-                  placeholderText="Select reminder date"
-                />
-              </div>
-            )}
-          </div>
           <div className="flex gap-2">
             <button
               onClick={handleSave}
-              className="px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700"
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
             >
               Save
             </button>
             <button
               onClick={handleCancel}
-              className="px-4 py-2 text-gray-700 bg-gray-200 rounded hover:bg-gray-300"
+              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
             >
               Cancel
             </button>
@@ -203,51 +147,49 @@ const SortableTaskCard = ({ task, onEdit, onDelete }: { task: Task; onEdit: (upd
   }
 
   return (
-    <div ref={setNodeRef} style={style} className="relative">
-      <div className="absolute top-2 right-2 z-10 flex gap-2">
-        <button
-          onClick={handleEdit}
-          className="px-3 py-1 text-white bg-blue-600 rounded hover:bg-blue-700 text-sm"
-        >
-          Edit
-        </button>
-        <button
-          onClick={handleDelete}
-          className="px-3 py-1 text-white bg-red-600 rounded hover:bg-red-700 text-sm"
-        >
-          Delete
-        </button>
-      </div>
-      <div {...attributes} {...listeners} className="cursor-move">
-        <div className="p-4 border rounded-lg shadow-sm bg-white">
-          <div className="flex flex-col gap-2 mb-2">
-            <div className="flex items-center gap-2">
-              <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(task.status)} text-white`}>
-                {task.status.replace("_", " ").toUpperCase()}
-              </span>
-              <h3 className="text-lg font-semibold flex-grow">{task.title}</h3>
-            </div>
-            {task.dueDate && (
-              <div className="text-sm text-gray-500">
-                Due: {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-              </div>
-            )}
-            {task.reminderEnabled && task.reminderDate && (
-              <div className="text-sm text-blue-500">
-                Reminder: {new Date(task.reminderDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-              </div>
-            )}
+    <div ref={setNodeRef} style={style} className="bg-white p-4 rounded-lg shadow mb-4">
+      <div className="flex justify-between items-start">
+        <div className="flex items-start gap-2">
+          {/* Dedicated drag handle */}
+          <div 
+            {...attributes} 
+            {...listeners} 
+            className="cursor-grab p-1 text-gray-400 hover:text-gray-600"
+            aria-label="Drag to reorder"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="5" r="1" />
+              <circle cx="9" cy="12" r="1" />
+              <circle cx="9" cy="19" r="1" />
+              <circle cx="15" cy="5" r="1" />
+              <circle cx="15" cy="12" r="1" />
+              <circle cx="15" cy="19" r="1" />
+            </svg>
           </div>
-          <p className="text-gray-600 mb-4">{task.description}</p>
-          
-          {/* Progress Bar */}
-          <div className="w-full h-2 bg-gray-200 rounded-full mb-4">
-            <div
-              className={`h-full rounded-full transition-all duration-300 ${getStatusColor(task.status)}`}
-              style={{ width: `${getProgressPercentage(task.status)}%` }}
-            />
+          <div>
+            <h3 className="text-lg font-semibold">{task.title}</h3>
+            <p className="text-gray-600">{task.description}</p>
           </div>
         </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleEdit}
+            className="text-blue-600 hover:text-blue-800"
+          >
+            Edit
+          </button>
+          <button
+            onClick={handleDelete}
+            className="text-red-600 hover:text-red-800"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+      <div className="mt-2">
+        <span className={`inline-block px-2 py-1 rounded text-white text-sm ${getStatusColor(task.status)}`}>
+          {task.status.replace('_', ' ')}
+        </span>
       </div>
     </div>
   );
@@ -255,216 +197,229 @@ const SortableTaskCard = ({ task, onEdit, onDelete }: { task: Task; onEdit: (upd
 
 const ProjectDetailsContent = ({ projectId }: ProjectDetailsContentProps) => {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState<"all" | "todo" | "in_progress" | "done">("all");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const supabase = createClientComponentClient<Database>();
 
-  // Set up sensors for drag and drop with improved configuration
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5,
-        delay: 0,
-      },
-    }),
+    useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
 
-  // Fetch tasks from Supabase on mount
   useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        setIsLoading(true);
-        const { data, error } = await supabase
-          .from("tasks")
-          .select("*")
-          .eq("project_id", projectId)
-          .order('order', { ascending: true });
-
-        if (error) {
-          console.error("Error fetching tasks:", error);
-        } else if (data) {
-          setTasks(data as Task[]);
-        }
-      } catch (err) {
-        console.error("Unexpected error while fetching tasks:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    if (projectId) {
-      fetchTasks();
-    }
+    fetchTasks();
   }, [projectId]);
 
-  // Handle adding a task
-  const handleAddTask = async (title: string, description: string, status: "todo" | "in_progress" | "done", dueDate?: string, reminderDate?: string, reminderEnabled?: boolean) => {
-    const { data, error } = await supabase
-      .from("tasks")
-      .insert([{ 
-        title, 
-        description, 
-        status, 
-        project_id: projectId,
-        dueDate,
-        reminderDate,
-        reminderEnabled
-      }])
-      .single();
-
-    if (error) {
-      console.error("Error adding task:", error.message);
-    } else {
-      setTasks((prevTasks) => [...prevTasks, data]);
-    }
-  };
-
-  // Handle deleting a task
-  const handleDeleteTask = async (taskId: string) => {
+  const fetchTasks = async () => {
     try {
-      console.log("Deleting task:", taskId);
-      const { error } = await supabase
-        .from("tasks")
-        .delete()
-        .eq("id", taskId)
-        .eq("project_id", projectId); // Add project_id check for safety
-
-      if (error) {
-        console.error("Error deleting task:", error);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setError('Not authenticated');
+        setLoading(false);
         return;
       }
 
-      // Update local state only after successful deletion
-      setTasks((prevTasks) => prevTasks.filter((task) => task.id !== taskId));
-      console.log("Task deleted successfully");
+      const { data, error: fetchError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: true });
+
+      if (fetchError) {
+        console.error('Supabase error:', fetchError);
+        setError(fetchError.message || 'Failed to load tasks');
+        return;
+      }
+
+      setTasks(data || []);
+      setError(null);
     } catch (err) {
-      console.error("Unexpected error while deleting task:", err);
+      console.error('Error fetching tasks:', err);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Handle task editing
+  const handleAddTask = async (title: string, description: string, status: "todo" | "in_progress" | "done", dueDate?: string, reminderDate?: string, reminderEnabled?: boolean) => {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        console.error('User authentication error:', userError);
+        setError('Not authenticated');
+        return;
+      }
+
+      const userId = user.id;
+      
+      // First check if the project exists and belongs to the user
+      const { data: project, error: projectError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .eq('user_id', userId)
+        .single();
+
+      if (projectError || !project) {
+        console.error('Project verification error:', projectError);
+        setError('Project not found or access denied');
+        return;
+      }
+
+      // Now insert the task
+      const { data, error } = await supabase
+        .from('tasks')
+        .insert([
+          {
+            title,
+            description,
+            status,
+            project_id: projectId,
+            due_date: dueDate ? new Date(dueDate).toISOString() : null
+          }
+        ])
+        .select();
+
+      if (error) {
+        console.error('Supabase error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        throw error;
+      }
+
+      console.log('Task added successfully:', data);
+      fetchTasks();
+    } catch (error) {
+      console.error('Error adding task:', error);
+      if (error instanceof Error) {
+        setError(`Failed to add task: ${error.message}`);
+      } else {
+        setError('Failed to add task: Unknown error occurred');
+      }
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      console.log('Deleting task with ID:', taskId);
+
+      const { data, error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', taskId)
+        .select();
+
+      if (error) {
+        console.error('Error deleting task:', error);
+        throw error;
+      }
+
+      console.log('Task deleted successfully:', data);
+      setTasks(tasks.filter(task => task.id !== taskId));
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      setError('Failed to delete task');
+    }
+  };
+
   const handleEditTask = async (updatedTask: Task) => {
-    const { data, error } = await supabase
-      .from("tasks")
-      .update({
+    try {
+      console.log('Editing task with data:', {
+        id: updatedTask.id,
         title: updatedTask.title,
         description: updatedTask.description,
         status: updatedTask.status,
-      })
-      .eq("id", updatedTask.id)
-      .select()
-      .single();
+        due_date: updatedTask.dueDate ? new Date(updatedTask.dueDate).toISOString() : null
+      });
 
-    if (error) {
-      console.error("Error editing task:", error.message);
-      return;
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({
+          title: updatedTask.title,
+          description: updatedTask.description,
+          status: updatedTask.status,
+          due_date: updatedTask.dueDate ? new Date(updatedTask.dueDate).toISOString() : null
+        })
+        .eq('id', updatedTask.id)
+        .select();
+
+      if (error) {
+        console.error('Error updating task:', error);
+        throw error;
+      }
+
+      console.log('Task updated successfully:', data);
+      setTasks(tasks.map(task => task.id === updatedTask.id ? updatedTask : task));
+    } catch (error) {
+      console.error('Error updating task:', error);
+      setError('Failed to update task');
     }
-
-    setTasks((prevTasks) =>
-      prevTasks.map((task) => (task.id === updatedTask.id ? data : task))
-    );
   };
 
-  // Handle drag and drop
   const handleDragEnd = (event: any) => {
     const { active, over } = event;
     
     if (active.id !== over.id) {
-      setTasks((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over.id);
+      setTasks((tasks) => {
+        const oldIndex = tasks.findIndex((task) => task.id === active.id);
+        const newIndex = tasks.findIndex((task) => task.id === over.id);
         
-        const newItems = arrayMove(items, oldIndex, newIndex);
-        
-        // Update the order in the database
-        const updates = newItems.map((task, index) => ({
-          id: task.id,
-          order: index,
-          project_id: projectId,
-          title: task.title,
-          description: task.description,
-          status: task.status
-        }));
-        
-        // Update database asynchronously
-        supabase
-          .from("tasks")
-          .upsert(updates, { onConflict: 'id' })
-          .then(({ error }) => {
-            if (error) {
-              console.error("Error updating task order:", error.message);
-            }
-          });
-        
-        return newItems;
+        return arrayMove(tasks, oldIndex, newIndex);
       });
     }
   };
 
-  const filteredTasks = tasks && tasks.length > 0
-    ? tasks.filter((task) => task && (filterStatus === "all" || task?.status === filterStatus))
-    : [];
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-8">
+    <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
-        <Link 
-          href="/dashboard" 
-          className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-        >
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Back to Dashboard
+        <Link href="/dashboard" className="text-blue-600 hover:text-blue-800">
+          ← Back to Dashboard
         </Link>
-        <h1 className="text-3xl font-bold">Project Tasks</h1>
       </div>
 
-      {/* Task Form */}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+
       <TaskForm onAddTask={handleAddTask} />
 
-      {/* Filter Buttons */}
-      <div className="flex gap-4 my-6">
-        {["all", "todo", "in_progress", "done"].map((status) => (
-          <button
-            key={status}
-            onClick={() => setFilterStatus(status as "all" | "todo" | "in_progress" | "done")}
-            className={`px-4 py-2 rounded-lg ${filterStatus === status ? "bg-blue-600 text-white" : "bg-gray-200"}`}
-          >
-            {status === "all" ? "All" : status.replace("_", " ").toUpperCase()}
-          </button>
-        ))}
-      </div>
-
-      {/* Loading State */}
-      {isLoading ? (
-        <div className="flex justify-center items-center min-h-[200px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      ) : (
+      <div className="mt-8">
+        <h2 className="text-2xl font-bold mb-4">Tasks</h2>
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
         >
           <SortableContext
-            items={filteredTasks.map(task => task.id)}
+            items={tasks.map(task => task.id)}
             strategy={verticalListSortingStrategy}
           >
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 transition-all duration-300">
-              {filteredTasks.map((task) => (
-                <SortableTaskCard
-                  key={task.id}
-                  task={task}
-                  onEdit={handleEditTask}
-                  onDelete={handleDeleteTask}
-                />
-              ))}
-            </div>
+            {tasks.map((task) => (
+              <SortableTaskCard
+                key={task.id}
+                task={task}
+                onEdit={handleEditTask}
+                onDelete={handleDeleteTask}
+              />
+            ))}
           </SortableContext>
         </DndContext>
-      )}
+      </div>
     </div>
   );
 };
