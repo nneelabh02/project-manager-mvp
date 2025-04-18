@@ -3,16 +3,18 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation'; // For navigating
 import { useParams } from 'next/navigation'; // For getting projectId and taskId
-import { supabase } from '@/utils/supabaseClient'; // Your supabase client
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { Database } from "@/types/supabase";
 
 export default function EditTask() {
   const router = useRouter();
   const { projectId, taskId } = useParams(); // Get projectId and taskId from URL params
+  const supabase = createClientComponentClient<Database>();
 
   // State for form fields
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [status, setStatus] = useState('To Do');
+  const [status, setStatus] = useState('todo');
   const [dueDate, setDueDate] = useState('');
   const [reminderTime, setReminderTime] = useState('1');
   const [loading, setLoading] = useState(true);

@@ -1,14 +1,18 @@
-// src/app/dashboard/[projectId]/[taskId].tsx
+"use client";
 
-import { useRouter } from "next/router";
+// src/app/dashboard/[projectId]/[taskId]/page.tsx
+
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { supabase } from "src/utils/supabaseClient"; // Adjust the path based on your project structure
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { Database } from "@/types/supabase";
 
-const TaskPage = () => {
+const TaskPage = ({ params }: { params: { projectId: string; taskId: string } }) => {
   const router = useRouter();
-  const { projectId, taskId } = router.query;
+  const { projectId, taskId } = params;
   const [task, setTask] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const supabase = createClientComponentClient<Database>();
 
   useEffect(() => {
     if (taskId && projectId) {
@@ -31,7 +35,7 @@ const TaskPage = () => {
 
       fetchTask();
     }
-  }, [taskId, projectId]);
+  }, [taskId, projectId, supabase]);
 
   if (loading) {
     return <div>Loading...</div>;
@@ -51,7 +55,7 @@ const TaskPage = () => {
       </div>
       <div className="mt-4">
         <button
-          onClick={() => router.push(`/dashboard/${projectId}`)} // Navigate back to the project board
+          onClick={() => router.push(`/projects/${projectId}`)} // Updated path to match your app structure
           className="px-4 py-2 bg-blue-600 text-white rounded-md"
         >
           Back to Project Board

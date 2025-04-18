@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/utils/supabaseClient";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { Database } from "@/types/supabase";
 import Link from "next/link";
 
 interface Task {
@@ -28,6 +29,7 @@ interface CompletedTask {
 export default function CompletedTasksPage() {
   const [tasks, setTasks] = useState<CompletedTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const supabase = createClientComponentClient<Database>();
 
   useEffect(() => {
     const fetchCompletedTasks = async () => {

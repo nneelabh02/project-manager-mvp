@@ -3,18 +3,20 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
-import { supabase } from '@/utils/supabaseClient';
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { Database } from "@/types/supabase";
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function CreateTask() {
   const router = useRouter();
   const { projectId } = useParams();
   const { user } = useAuth();
+  const supabase = createClientComponentClient<Database>();
 
   // State for form fields
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [status, setStatus] = useState('To Do');
+  const [status, setStatus] = useState('todo');
   const [loading, setLoading] = useState(false);
 
   // Handle form submission
@@ -88,9 +90,9 @@ export default function CreateTask() {
             onChange={(e) => setStatus(e.target.value)}
             className="w-full p-2 border rounded"
           >
-            <option value="To Do">To Do</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Completed">Completed</option>
+            <option value="todo">To Do</option>
+            <option value="in-progress">In Progress</option>
+            <option value="completed">Completed</option>
           </select>
         </div>
 

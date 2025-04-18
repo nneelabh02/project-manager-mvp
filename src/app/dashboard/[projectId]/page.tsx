@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation'; // Import router for navigation
 import { useParams } from 'next/navigation'; // For getting projectId
-import { supabase } from '@/utils/supabaseClient'; // Your supabase client
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { Database } from "@/types/supabase";
 
 export default function ProjectBoard() {
   const router = useRouter();
   const { projectId } = useParams(); // Get projectId from URL params
+  const supabase = createClientComponentClient<Database>();
 
   // State to store tasks
   const [tasks, setTasks] = useState<any[]>([]);
@@ -19,20 +21,22 @@ export default function ProjectBoard() {
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
-        .eq('project_id', projectId);
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: true });
 
       if (error) {
         console.error('Error fetching tasks:', error);
-        setLoading(false);
         return;
       }
 
-      setTasks(data); // Set tasks in state
-      setLoading(false); // Stop loading
+      setTasks(data || []);
+      setLoading(false);
     };
 
-    fetchTasks();
-  }, [projectId]);
+    if (projectId) {
+      fetchTasks();
+    }
+  }, [projectId, supabase]);
 
   return (
     <div className="p-6">
