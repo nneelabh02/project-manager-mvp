@@ -1,6 +1,6 @@
 # Project Manager MVP
 
-A modern project management application built with Next.js, Supabase, and OpenAI integration.
+A modern project management application built with Next.js and Supabase.
 
 ## Architecture
 
@@ -16,7 +16,6 @@ graph TD
         A --> G[Components]
         G --> H[TaskCard]
         G --> I[TaskForm]
-        G --> J[AIFeatures]
         G --> K[AuthForm]
         
         A --> L[Contexts]
@@ -28,16 +27,10 @@ graph TD
         N --> P[Database]
         P --> Q[Projects Table]
         P --> R[Tasks Table]
-        
-        S[OpenAI API] --> T[AI Features]
-        T --> U[Task Suggestions]
-        T --> V[Project Summaries]
-        T --> W[Task Prioritization]
     end
 
     Frontend --> Backend
     M --> N
-    J --> S
 
     classDef frontend fill:#f9f,stroke:#333,stroke-width:2px
     classDef backend fill:#bbf,stroke:#333,stroke-width:2px
@@ -50,13 +43,12 @@ graph TD
 - **Next.js App**: The main application framework
   - **Pages**: 
     - Dashboard: Main project overview
-    - Project Details: Individual project view
+    - Project Details: Individual project view with drag-and-drop task management
     - Task Management: Task creation and editing
     - Authentication: Login and signup
   - **Components**:
-    - TaskCard: Display individual tasks
+    - TaskCard: Display individual tasks with drag handle
     - TaskForm: Create and edit tasks
-    - AIFeatures: AI-powered task suggestions and summaries
     - AuthForm: User authentication forms
   - **Contexts**:
     - AuthContext: Manages authentication state
@@ -67,45 +59,40 @@ graph TD
   - Database: 
     - Projects Table: Stores project information
     - Tasks Table: Stores task details and relationships
-- **OpenAI API**:
-  - Task Suggestions: AI-generated task recommendations
-  - Project Summaries: Automated project progress summaries
-  - Task Prioritization: AI-assisted task ordering
 
 #### Data Flow
-- Frontend components communicate with backend services
+- Frontend components communicate with Supabase backend
 - Authentication state is managed through AuthContext
-- AI features are integrated through OpenAI API calls
+- Real-time updates through Supabase subscriptions
 
 ## Features
 - User authentication and authorization
 - Project and task management
-- Drag-and-drop task organization
-- AI-powered task suggestions
-- Project progress summaries
-- Task prioritization
+- Intuitive drag-and-drop task organization
+- Real-time updates
+- Task status tracking
+- Due date management
 - Responsive design
 
 ## Tech Stack
 - **Frontend**: Next.js, React, TypeScript, Tailwind CSS
 - **Backend**: Supabase (Auth + Database)
-- **AI Integration**: OpenAI API
 - **Styling**: Tailwind CSS
 - **State Management**: React Context API
+- **Drag and Drop**: DND Kit
 
 ## Getting Started
 1. Clone the repository
 2. Install dependencies: `npm install`
 3. Set up environment variables:
    - Create `.env.local` file
-   - Add your Supabase and OpenAI API keys
+   - Add your Supabase configuration
 4. Run the development server: `npm run dev`
 
 ## Environment Variables
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-OPENAI_API_KEY=your_openai_api_key
 ```
 
 ## Database Schema
@@ -123,5 +110,4 @@ OPENAI_API_KEY=your_openai_api_key
 - status: Enum ('todo', 'in_progress', 'done')
 - due_date: Timestamp
 - project_id: UUID (Foreign Key)
-- user_id: UUID (Foreign Key)
 - order: Integer
