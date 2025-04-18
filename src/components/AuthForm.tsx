@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { supabase } from "@/utils/supabaseClient";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
-
+import { Database } from "@/types/supabase";
 
 interface AuthFormProps {
   mode: "login" | "signup";
@@ -11,27 +11,28 @@ interface AuthFormProps {
 
 export default function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
+  const supabase = createClientComponentClient<Database>();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLogin, setIsLogin] = useState(mode === "login");
   const [errorMsg, setErrorMsg] = useState("");
   
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
 
     try {
       if (isLogin) {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
-        router.push("/dashboard"); // ✅ Redirect after login
+        router.refresh(); // Refresh the page to update the session
+        router.push("/dashboard");
       } else {
-        const { data, error } = await supabase.auth.signUp({
+        const { error } = await supabase.auth.signUp({
           email,
           password,
         });

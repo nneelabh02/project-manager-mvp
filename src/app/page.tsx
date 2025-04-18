@@ -1,16 +1,7 @@
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
-
-export default async function Home() {
-  const supabase = createServerComponentClient({ cookies });
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session) {
-    redirect('/login'); // ✅ correct path
-  } else {
-    redirect('/dashboard');
-  }
+export default function Home() {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
+    </div>
+  );
 }

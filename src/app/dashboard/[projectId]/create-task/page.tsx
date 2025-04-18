@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/utils/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function CreateTask() {
