@@ -17,93 +17,54 @@ interface Activity {
   new_status?: string;
 }
 
-interface Task {
-  id: string;
-  title: string;
-  status: string;
-  project_id: string;
-  created_at: string;
-  projects: {
-    title: string;
-  }[];
-}
-
 export default function RecentActivityPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const supabase = createClientComponentClient<Database>();
 
   useEffect(() => {
     const fetchActivities = async () => {
       try {
-        setIsLoading(true);
-        console.log('Fetching user...');
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        const { data: { session } } = await supabase.auth.getSession();
         
-        if (userError) {
-          console.error('Error fetching user:', userError);
-          return;
-        }
-        
-        if (!user) {
-          console.error('No user found');
+        if (!session) {
+          setError("You must be logged in to view activities");
           return;
         }
 
-        console.log('Fetching tasks for user:', user.id);
-        const response = await supabase
-          .from('tasks')
-          .select(`
-            id,
-            title,
-            status,
-            project_id,
-            created_at,
-            projects!inner (
-              title,
-              user_id
-            )
-          `)
-          .eq('projects.user_id', user.id)
+        // First check if the activities table exists
+        const { data: tableExists, error: tableError } = await supabase
+          .from('activities')
+          .select('id')
+          .limit(1);
+
+        if (tableError) {
+          if (tableError.code === '42P01') { // Table doesn't exist
+            setError("Activities feature is not available yet");
+            return;
+          }
+          throw tableError;
+        }
+
+        const { data, error } = await supabase
+          .from('activities')
+          .select('*')
           .order('created_at', { ascending: false })
-          .limit(20);
+          .limit(50);
 
-        console.log('Raw Supabase response:', response);
-
-        if (response.error) {
-          console.error('Supabase error:', response.error);
-          throw response.error;
-        }
-
-        const { data: tasks } = response;
-
-        if (!tasks) {
-          console.error('No data returned from Supabase');
-          return;
-        }
-
-        console.log('Tasks fetched successfully:', tasks.length);
-        // Transform tasks into activities
-        const taskActivities: Activity[] = tasks.map((task) => ({
-          id: task.id,
-          type: 'task_create',
-          task_id: task.id,
-          project_id: task.project_id,
-          created_at: task.created_at,
-          task_title: task.title,
-          project_title: task.projects[0]?.title || 'Unknown Project',
-        }));
-
-        setActivities(taskActivities);
-      } catch (error) {
-        console.error('Error fetching activities:', error);
+        if (error) throw error;
+        setActivities(data || []);
+      } catch (err) {
+        console.error('Error:', err);
+        setError("Failed to load activities. Please try again later.");
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchActivities();
-  }, []);
+  }, [supabase]);
 
   const getActivityDescription = (activity: Activity) => {
     switch (activity.type) {
@@ -142,6 +103,12 @@ export default function RecentActivityPage() {
           Back to Dashboard
         </Link>
       </div>
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow-sm">
         {activities.length === 0 ? (

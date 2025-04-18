@@ -86,7 +86,6 @@ export default function DashboardPage() {
 
       setTitle("");
 
-      // Refresh projects list
       const { data, error: fetchError } = await supabase
         .from("projects")
         .select(`
@@ -102,9 +101,9 @@ export default function DashboardPage() {
 
       if (fetchError) throw fetchError;
       setProjects(data || []);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error adding project:", error);
-      setError(error.message || "Failed to add project. Please try again.");
+      setError("Failed to add project. Please try again.");
     }
   };
 

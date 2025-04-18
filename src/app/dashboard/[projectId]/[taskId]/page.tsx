@@ -7,10 +7,20 @@ import { useEffect, useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Database } from "@/types/supabase";
 
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  project_id: string;
+  created_at: string;
+  due_date?: string;
+}
+
 const TaskPage = ({ params }: { params: { projectId: string; taskId: string } }) => {
   const router = useRouter();
   const { projectId, taskId } = params;
-  const [task, setTask] = useState<any>(null);
+  const [task, setTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClientComponentClient<Database>();
 

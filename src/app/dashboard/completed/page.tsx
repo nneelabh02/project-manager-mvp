@@ -5,7 +5,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Database } from "@/types/supabase";
 import Link from "next/link";
 
-interface Task {
+interface CompletedTask {
   id: string;
   title: string;
   description: string;
@@ -17,116 +17,52 @@ interface Task {
   }[];
 }
 
-interface CompletedTask {
-  id: string;
-  title: string;
-  description: string;
-  completed_at: string;
-  project_id: string;
-  project_title: string;
-}
-
 export default function CompletedTasksPage() {
   const [tasks, setTasks] = useState<CompletedTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const supabase = createClientComponentClient<Database>();
 
   useEffect(() => {
     const fetchCompletedTasks = async () => {
       try {
-        setIsLoading(true);
+        const { data: { session } } = await supabase.auth.getSession();
         
-        // Validate Supabase client configuration
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-          console.error('Supabase configuration is missing');
+        if (!session) {
+          setError("You must be logged in to view completed tasks");
           return;
         }
 
-        console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
-        console.log('Supabase client:', supabase);
-
-        console.log('Fetching user...');
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        
-        if (userError) {
-          console.error('Error fetching user:', userError);
-          return;
-        }
-        
-        if (!user) {
-          console.error('No user found');
-          return;
-        }
-
-        console.log('Fetching tasks for user:', user.id);
-        const response = await supabase
+        const { data, error } = await supabase
           .from('tasks')
           .select(`
-            id,
-            title,
-            description,
-            created_at,
-            project_id,
-            status,
-            projects!inner (
-              title,
-              user_id
+            *,
+            projects (
+              title
             )
           `)
-          .eq('projects.user_id', user.id)
           .eq('status', 'done')
           .order('created_at', { ascending: false });
 
-        console.log('Raw Supabase response:', response);
-        console.log('Response data:', response.data);
-        console.log('Response error:', response.error);
-        console.log('Response status:', response.status);
-        console.log('Response statusText:', response.statusText);
-
-        // Validate response structure
-        if (!response || typeof response !== 'object') {
-          console.error('Invalid response structure:', response);
-          return;
+        if (error) {
+          if (error.code === '42P01') { // Table doesn't exist
+            setError("Tasks feature is not available yet");
+            return;
+          }
+          throw error;
         }
 
-        if (response.error) {
-          const errorDetails = {
-            message: response.error.message || 'Unknown error',
-            details: response.error.details || 'No details available',
-            hint: response.error.hint || 'No hint available',
-            code: response.error.code || 'No error code'
-          };
-          console.error('Supabase error details:', errorDetails);
-          throw new Error(`Supabase error: ${errorDetails.message}`);
-        }
-
-        const { data, error } = response;
-
-        if (!data) {
-          console.error('No data returned from Supabase');
-          return;
-        }
-
-        console.log('Tasks fetched successfully:', data.length);
-        const formattedTasks = data.map((task) => ({
-          id: task.id,
-          title: task.title,
-          description: task.description,
-          completed_at: task.created_at,
-          project_id: task.project_id,
-          project_title: task.projects[0]?.title || 'Unknown Project'
-        }));
-
-        setTasks(formattedTasks);
-      } catch (error) {
-        console.error('Error fetching completed tasks:', error);
+        setTasks(data || []);
+      } catch (err) {
+        console.error('Error:', err);
+        setError("Failed to load completed tasks. Please try again later.");
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchCompletedTasks();
-  }, []);
+  }, [supabase]);
 
   if (isLoading) {
     return (
@@ -151,6 +87,12 @@ export default function CompletedTasksPage() {
         </Link>
       </div>
 
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow-sm">
         {tasks.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
@@ -174,7 +116,7 @@ export default function CompletedTasksPage() {
                         <h3 className="text-lg font-medium text-gray-900">{task.title}</h3>
                         <p className="text-sm text-gray-500">{task.description}</p>
                         <p className="text-sm text-gray-500 mt-1">
-                          Completed on {new Date(task.completed_at).toLocaleDateString()}
+                          Completed on {new Date(task.created_at).toLocaleDateString()}
                         </p>
                       </div>
                     </div>

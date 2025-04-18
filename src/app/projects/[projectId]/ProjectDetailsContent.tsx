@@ -1,195 +1,134 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import TaskForm from "@/components/TaskForm";
-import TaskCard from "@/components/TaskCard";
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import Link from 'next/link';
-import DatePicker from 'react-datepicker';
 import { Database } from "@/types/supabase";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import Link from "next/link";
+import TaskForm from "@/components/TaskForm";
+import { logActivity } from "@/utils/activities";
 
-// Define the Task interface
 interface Task {
   id: string;
   title: string;
   description: string;
-  status: "todo" | "in_progress" | "done";
-  dueDate?: string;
-  reminderDate?: string;
-  reminderEnabled?: boolean;
+  status: string;
+  project_id: string;
+  created_at: string;
+  completed_at?: string;
+  due_date?: string;
 }
 
-const getStatusColor = (status: Task["status"]) => {
-  switch (status) {
-    case "todo":
-      return "bg-gray-500";
-    case "in_progress":
-      return "bg-blue-500";
-    case "done":
-      return "bg-green-500";
-    default:
-      return "bg-gray-500";
-  }
-};
-
-const getProgressPercentage = (status: Task["status"]) => {
-  switch (status) {
-    case "todo":
-      return 0;
-    case "in_progress":
-      return 50;
-    case "done":
-      return 100;
-    default:
-      return 0;
-  }
-};
+interface Project {
+  id: string;
+  title: string;
+  description: string;
+  created_at: string;
+}
 
 interface ProjectDetailsContentProps {
   projectId: string;
 }
 
-// Sortable Task Card component
-const SortableTaskCard = ({ task, onEdit, onDelete }: { task: Task; onEdit: (updatedTask: Task) => void; onDelete: (taskId: string) => void }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedTask, setEditedTask] = useState<Task>(task);
+const SortableTaskCard = ({ task, onEdit, onDelete }: { task: Task; onEdit: (task: Task) => void; onDelete: (taskId: string) => void }) => {
   const {
     attributes,
     listeners,
     setNodeRef,
     transform,
     transition,
-    isDragging,
-  } = useSortable({ 
-    id: task.id,
-    transition: {
-      duration: 300,
-      easing: 'cubic-bezier(0.2, 0, 0, 1)',
-    }
-  });
+    isDragging
+  } = useSortable({ id: task.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.8 : 1,
-    position: 'relative' as const,
-    zIndex: isDragging ? 1 : 0,
-    boxShadow: isDragging ? '0 8px 16px rgba(0,0,0,0.1)' : 'none',
+    opacity: isDragging ? 0.5 : 1,
   };
 
-  const handleDelete = () => {
-    console.log("Delete clicked for task:", task.id);
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'todo':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'in_progress':
+        return 'bg-blue-100 text-blue-800';
+      case 'done':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getProgressWidth = (status: string) => {
+    switch (status) {
+      case 'todo':
+        return 'w-1/3';
+      case 'in_progress':
+        return 'w-2/3';
+      case 'done':
+        return 'w-full';
+      default:
+        return 'w-0';
+    }
+  };
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onEdit(task);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     onDelete(task.id);
   };
 
-  const handleEdit = () => {
-    console.log("Edit clicked for task:", task.id);
-    setIsEditing(true);
-  };
-
-  const handleSave = () => {
-    console.log("Save clicked for task:", editedTask.id);
-    onEdit(editedTask);
-    setIsEditing(false);
-  };
-
-  const handleCancel = () => {
-    setEditedTask(task);
-    setIsEditing(false);
-  };
-
-  if (isEditing) {
-    return (
-      <div ref={setNodeRef} style={style} className="bg-white p-4 rounded-lg shadow mb-4">
-        <div className="space-y-4">
-          <input
-            type="text"
-            value={editedTask.title}
-            onChange={(e) => setEditedTask({ ...editedTask, title: e.target.value })}
-            className="w-full p-2 border rounded"
-            placeholder="Task title"
-          />
-          <textarea
-            value={editedTask.description}
-            onChange={(e) => setEditedTask({ ...editedTask, description: e.target.value })}
-            className="w-full p-2 border rounded"
-            placeholder="Task description"
-          />
-          <select
-            value={editedTask.status}
-            onChange={(e) => setEditedTask({ ...editedTask, status: e.target.value as Task["status"] })}
-            className="w-full p-2 border rounded"
-          >
-            <option value="todo">To Do</option>
-            <option value="in_progress">In Progress</option>
-            <option value="done">Done</option>
-          </select>
-          <div className="flex gap-2">
-            <button
-              onClick={handleSave}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-            >
-              Save
-            </button>
-            <button
-              onClick={handleCancel}
-              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div ref={setNodeRef} style={style} className="bg-white p-4 rounded-lg shadow mb-4">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="p-4 border rounded-lg mb-4 bg-white hover:shadow-md transition-shadow"
+    >
       <div className="flex justify-between items-start">
-        <div className="flex items-start gap-2">
-          {/* Dedicated drag handle */}
-          <div 
-            {...attributes} 
-            {...listeners} 
-            className="cursor-grab p-1 text-gray-400 hover:text-gray-600"
-            aria-label="Drag to reorder"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="9" cy="5" r="1" />
-              <circle cx="9" cy="12" r="1" />
-              <circle cx="9" cy="19" r="1" />
-              <circle cx="15" cy="5" r="1" />
-              <circle cx="15" cy="12" r="1" />
-              <circle cx="15" cy="19" r="1" />
-            </svg>
+        <div 
+          className="flex-1 cursor-grab"
+          {...attributes}
+          {...listeners}
+        >
+          <h3 className="text-lg font-semibold">{task.title}</h3>
+          <p className="text-gray-600">{task.description}</p>
+          <div className="mt-2">
+            <span className={`px-2 py-1 rounded-full text-sm ${getStatusColor(task.status)}`}>
+              {task.status.replace('_', ' ')}
+            </span>
           </div>
-          <div>
-            <h3 className="text-lg font-semibold">{task.title}</h3>
-            <p className="text-gray-600">{task.description}</p>
+          {task.due_date && (
+            <p className="text-sm text-gray-500 mt-2">
+              Due: {new Date(task.due_date).toLocaleDateString()}
+            </p>
+          )}
+          <div className="mt-2 w-full bg-gray-200 rounded-full h-2.5">
+            <div className={`h-2.5 rounded-full ${getStatusColor(task.status).replace('text', 'bg')} ${getProgressWidth(task.status)}`}></div>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex space-x-2 ml-4">
           <button
             onClick={handleEdit}
-            className="text-blue-600 hover:text-blue-800"
+            className="text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50"
           >
             Edit
           </button>
           <button
             onClick={handleDelete}
-            className="text-red-600 hover:text-red-800"
+            className="text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50"
           >
             Delete
           </button>
         </div>
-      </div>
-      <div className="mt-2">
-        <span className={`inline-block px-2 py-1 rounded text-white text-sm ${getStatusColor(task.status)}`}>
-          {task.status.replace('_', ' ')}
-        </span>
       </div>
     </div>
   );
@@ -197,8 +136,10 @@ const SortableTaskCard = ({ task, onEdit, onDelete }: { task: Task; onEdit: (upd
 
 const ProjectDetailsContent = ({ projectId }: ProjectDetailsContentProps) => {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const supabase = createClientComponentClient<Database>();
 
   const sensors = useSensors(
@@ -208,168 +149,208 @@ const ProjectDetailsContent = ({ projectId }: ProjectDetailsContentProps) => {
     })
   );
 
-  useEffect(() => {
-    fetchTasks();
-  }, [projectId]);
-
-  const fetchTasks = async () => {
+  const fetchProject = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setError('Not authenticated');
-        setLoading(false);
-        return;
-      }
-
-      const { data, error: fetchError } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('created_at', { ascending: true });
-
-      if (fetchError) {
-        console.error('Supabase error:', fetchError);
-        setError(fetchError.message || 'Failed to load tasks');
-        return;
-      }
-
-      setTasks(data || []);
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching tasks:', err);
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAddTask = async (title: string, description: string, status: "todo" | "in_progress" | "done", dueDate?: string, reminderDate?: string, reminderEnabled?: boolean) => {
-    try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        console.error('User authentication error:', userError);
-        setError('Not authenticated');
-        return;
-      }
-
-      const userId = user.id;
-      
-      // First check if the project exists and belongs to the user
-      const { data: project, error: projectError } = await supabase
+      const { data, error } = await supabase
         .from('projects')
         .select('*')
         .eq('id', projectId)
-        .eq('user_id', userId)
         .single();
 
-      if (projectError || !project) {
-        console.error('Project verification error:', projectError);
-        setError('Project not found or access denied');
+      if (error) throw error;
+      setProject(data);
+    } catch (error) {
+      console.error('Error fetching project:', error);
+      setError('Failed to load project details');
+    }
+  }, [projectId, supabase]);
+
+  const fetchTasks = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        setError("You must be logged in to view tasks");
         return;
       }
 
-      // Now insert the task
       const { data, error } = await supabase
-        .from('tasks')
-        .insert([
-          {
-            title,
-            description,
-            status,
-            project_id: projectId,
-            due_date: dueDate ? new Date(dueDate).toISOString() : null
-          }
-        ])
-        .select();
+        .from("tasks")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: true });
 
-      if (error) {
-        console.error('Supabase error details:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        throw error;
-      }
-
-      console.log('Task added successfully:', data);
-      fetchTasks();
+      if (error) throw error;
+      setTasks(data || []);
     } catch (error) {
-      console.error('Error adding task:', error);
-      if (error instanceof Error) {
-        setError(`Failed to add task: ${error.message}`);
-      } else {
-        setError('Failed to add task: Unknown error occurred');
-      }
+      console.error("Error fetching tasks:", error);
+      setError("Failed to load tasks. Please try again.");
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [projectId, supabase]);
 
-  const handleDeleteTask = async (taskId: string) => {
+  useEffect(() => {
+    fetchProject();
+    fetchTasks();
+  }, [fetchProject, fetchTasks]);
+
+  const handleAddTask = async (title: string, description: string, status: string = 'todo') => {
     try {
-      console.log('Deleting task with ID:', taskId);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('You must be logged in to add tasks');
+      }
 
-      const { data, error } = await supabase
+      const { data: task, error } = await supabase
         .from('tasks')
-        .delete()
-        .eq('id', taskId)
-        .select();
+        .insert([{
+          title,
+          description,
+          project_id: projectId,
+          status,
+          created_at: new Date().toISOString(),
+          completed_at: status === 'done' ? new Date().toISOString() : null
+        }])
+        .select()
+        .single();
 
-      if (error) {
-        console.error('Error deleting task:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('Task deleted successfully:', data);
-      setTasks(tasks.filter(task => task.id !== taskId));
-    } catch (error) {
-      console.error('Error deleting task:', error);
-      setError('Failed to delete task');
-    }
-  };
-
-  const handleEditTask = async (updatedTask: Task) => {
-    try {
-      console.log('Editing task with data:', {
-        id: updatedTask.id,
-        title: updatedTask.title,
-        description: updatedTask.description,
-        status: updatedTask.status,
-        due_date: updatedTask.dueDate ? new Date(updatedTask.dueDate).toISOString() : null
+      // Log activity
+      await logActivity({
+        type: 'task_create',
+        task_id: task.id,
+        project_id: projectId,
+        task_title: title,
+        project_title: project?.title || ''
       });
 
-      const { data, error } = await supabase
+      setTasks(prev => [...prev, task]);
+    } catch (error) {
+      console.error('Error adding task:', error);
+      alert('Failed to add task. Please try again.');
+    }
+  };
+
+  const handleEditTask = async (task: Task) => {
+    setEditingTask(task);
+  };
+
+  const handleSaveEdit = async (updatedTask: Task) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('You must be logged in to edit tasks');
+      }
+
+      const oldTask = tasks.find(t => t.id === updatedTask.id);
+      if (!oldTask) {
+        console.error('Task not found:', updatedTask.id);
+        return;
+      }
+
+      const { data: savedTask, error } = await supabase
         .from('tasks')
         .update({
-          title: updatedTask.title,
-          description: updatedTask.description,
-          status: updatedTask.status,
-          due_date: updatedTask.dueDate ? new Date(updatedTask.dueDate).toISOString() : null
+          ...updatedTask,
+          completed_at: updatedTask.status === 'done' ? new Date().toISOString() : null
         })
         .eq('id', updatedTask.id)
-        .select();
+        .select()
+        .single();
 
       if (error) {
         console.error('Error updating task:', error);
         throw error;
       }
 
-      console.log('Task updated successfully:', data);
-      setTasks(tasks.map(task => task.id === updatedTask.id ? updatedTask : task));
+      // Log activity
+      await logActivity({
+        type: 'task_update',
+        task_id: updatedTask.id,
+        project_id: projectId,
+        task_title: updatedTask.title,
+        project_title: project?.title || '',
+        old_status: oldTask.status,
+        new_status: updatedTask.status
+      });
+
+      setTasks(prev => prev.map(t => t.id === updatedTask.id ? savedTask : t));
+      setEditingTask(null);
     } catch (error) {
       console.error('Error updating task:', error);
-      setError('Failed to update task');
+      alert(error instanceof Error ? error.message : 'Failed to update task. Please try again.');
     }
   };
 
-  const handleDragEnd = (event: any) => {
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('You must be logged in to delete tasks');
+      }
+
+      // First delete related activities
+      const { error: activitiesError } = await supabase
+        .from('activities')
+        .delete()
+        .eq('task_id', taskId);
+
+      if (activitiesError) {
+        console.error('Error deleting related activities:', activitiesError);
+        throw new Error(`Failed to delete related activities: ${activitiesError.message}`);
+      }
+
+      // Then delete the task
+      const { error: taskError } = await supabase
+        .from("tasks")
+        .delete()
+        .eq("id", taskId);
+
+      if (taskError) {
+        console.error("Error deleting task:", taskError);
+        throw new Error(`Failed to delete task: ${taskError.message}`);
+      }
+
+      // Log activity for the deletion
+      await logActivity({
+        type: 'task_delete',
+        project_id: projectId,
+        project_title: project?.title || ''
+      });
+
+      // Update local state
+      setTasks((prevTasks) => prevTasks.filter((task) => task.id !== taskId));
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      alert(error instanceof Error ? error.message : 'Failed to delete task. Please try again.');
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     
-    if (active.id !== over.id) {
+    if (active.id !== over?.id) {
       setTasks((tasks) => {
         const oldIndex = tasks.findIndex((task) => task.id === active.id);
-        const newIndex = tasks.findIndex((task) => task.id === over.id);
+        const newIndex = tasks.findIndex((task) => task.id === over?.id);
         
-        return arrayMove(tasks, oldIndex, newIndex);
+        const newTasks = arrayMove(tasks, oldIndex, newIndex);
+        
+        // Update task order in database
+        newTasks.forEach(async (task, index) => {
+          try {
+            await supabase
+              .from('tasks')
+              .update({ order: index })
+              .eq('id', task.id);
+          } catch (error) {
+            console.error('Error updating task order:', error);
+          }
+        });
+        
+        return newTasks;
       });
     }
   };
@@ -420,6 +401,72 @@ const ProjectDetailsContent = ({ projectId }: ProjectDetailsContentProps) => {
           </SortableContext>
         </DndContext>
       </div>
+
+      {/* Edit Task Modal */}
+      {editingTask && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-xl font-semibold mb-4">Edit Task</h3>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              handleSaveEdit({
+                ...editingTask,
+                title: formData.get('title') as string,
+                description: formData.get('description') as string,
+                status: formData.get('status') as string,
+              });
+            }}>
+              <div className="mb-4">
+                <label className="block text-gray-700 mb-2">Title</label>
+                <input
+                  type="text"
+                  name="title"
+                  defaultValue={editingTask.title}
+                  className="w-full px-3 py-2 border rounded"
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-gray-700 mb-2">Description</label>
+                <textarea
+                  name="description"
+                  defaultValue={editingTask.description}
+                  className="w-full px-3 py-2 border rounded"
+                  rows={3}
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-gray-700 mb-2">Status</label>
+                <select
+                  name="status"
+                  defaultValue={editingTask.status}
+                  className="w-full px-3 py-2 border rounded"
+                >
+                  <option value="todo">To Do</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="done">Done</option>
+                </select>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingTask(null)}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

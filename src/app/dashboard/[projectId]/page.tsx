@@ -6,13 +6,23 @@ import { useParams } from 'next/navigation'; // For getting projectId
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Database } from "@/types/supabase";
 
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  project_id: string;
+  created_at: string;
+  due_date?: string;
+}
+
 export default function ProjectBoard() {
   const router = useRouter();
   const { projectId } = useParams(); // Get projectId from URL params
   const supabase = createClientComponentClient<Database>();
 
   // State to store tasks
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Fetch tasks on page load
